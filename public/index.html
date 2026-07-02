@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>보이스피싱 판별기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EFF1EE;
+    --panel: #FFFFFF;
+    --ink: #14181A;
+    --ink-soft: #565F5B;
+    --ink-faint: #8B948F;
+    --line: #D6D9D2;
+    --line-strong: #B7BCB3;
+    --teal: #0F6E56;
+    --teal-soft: #E1F5EE;
+    --red: #A32D2D;
+    --red-soft: #FCEBEB;
+    --amber: #854F0B;
+    --amber-soft: #FAEEDA;
+    --green: #3B6D11;
+    --green-soft: #EAF3DE;
+    --radius: 3px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Noto Sans KR', sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .display { font-family: 'Space Grotesk', 'Noto Sans KR', sans-serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+
+  header {
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 20px;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    display: inline-block;
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 28px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3px;
+    background: var(--paper);
+  }
+
+  .tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px 0;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .tab-btn.active {
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  .tab-btn:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 150px;
+    resize: vertical;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--panel);
+  }
+
+  textarea:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 1px;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius);
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  .dropzone.drag-over {
+    background: var(--teal-soft);
+    border-color: var(--teal);
+  }
+
+  .dropzone p { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .dropzone .hint { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+
+  .file-chip {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--paper);
+    border-radius: var(--radius);
+    font-size: 13px;
+  }
+
+  .file-chip audio { flex: none; height: 30px; width: 160px; }
+  .file-chip .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-chip .remove { cursor: pointer; color: var(--ink-faint); background: none; border: none; font-size: 16px; padding: 0; }
+
+  .error-msg {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--red-soft);
+    color: var(--red);
+    font-size: 13px;
+    border-radius: var(--radius);
+  }
+
+  .analyze-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px 0;
+    background: var(--ink);
+    color: var(--panel);
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: opacity 0.12s;
+  }
+
+  .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .analyze-btn:not(:disabled):hover { opacity: 0.88; }
+
+  .analyze-btn .spinner {
+    display: none;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: -2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .analyze-btn.loading .spinner { animation: spin 0.7s linear infinite; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result {
+    display: none;
+    margin-top: 24px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .gauge-section {
+    padding: 24px 20px 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .gauge-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 12px 0 4px;
+  }
+
+  .gauge-level {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    margin: 0 0 16px;
+  }
+
+  .flags-section, .explain-section, .transcript-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+
+  .flag-item {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+  }
+  .flag-item:last-child { margin-bottom: 0; }
+  .flag-item .pattern { font-weight: 500; font-size: 13px; margin: 0; }
+  .flag-item .evidence { font-size: 13px; margin: 4px 0 0; opacity: 0.85; }
+
+  .no-flags { font-size: 13px; color: var(--ink-soft); }
+
+  .explain-section p { margin: 0; font-size: 14px; }
+
+  .transcript-section { border-bottom: none; }
+
+  .transcript-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .chevron { transition: transform 0.15s; }
+  .transcript-body {
+    display: none;
+    margin-top: 10px;
+    padding: 12px;
+    background: var(--paper);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+
+  footer {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">AI 기반 실시간 분석</p>
+    <h1>보이스피싱 판별기</h1>
+    <p class="sub">통화 스크립트나 녹음 파일을 넣으면 위험도와 판단 근거를 알려드려요.</p>
+  </header>
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-text" onclick="switchTab('text')">텍스트 붙여넣기</button>
+      <button class="tab-btn" id="tab-audio" onclick="switchTab('audio')">오디오 업로드</button>
+    </div>
+
+    <div id="panel-text">
+      <textarea id="script-input" placeholder="통화 내용을 붙여넣으세요. 예: 안녕하세요, 국민은행 보안팀입니다..."></textarea>
+    </div>
+
+    <div id="panel-audio" style="display:none">
+      <div class="dropzone" id="dropzone">
+        <p>클릭해서 파일 선택 또는 드래그해서 놓기</p>
+        <p class="hint">MP3 · WAV · M4A</p>
+        <input type="file" id="file-input" accept="audio/*" style="display:none">
+      </div>
+      <div class="file-chip" id="file-chip">
+        <span class="name" id="file-name"></span>
+        <audio id="file-preview" controls></audio>
+        <button class="remove" id="remove-file" aria-label="파일 제거">✕</button>
+      </div>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <button class="analyze-btn" id="analyze-btn" disabled>
+      <span class="spinner"></span><span id="btn-label">분석하기</span>
+    </button>
+  </div>
+
+  <div class="result" id="result">
+    <div class="gauge-section">
+      <svg width="180" height="100" viewBox="0 0 180 100" id="gauge-svg">
+        <path d="M 15 95 A 75 75 0 0 1 165 95" fill="none" stroke="#D6D9D2" stroke-width="12" stroke-linecap="round"/>
+        <path id="gauge-arc" d="M 15 95 A 75 75 0 0 1 165 95" fill="none" stroke="#3B6D11" stroke-width="12" stroke-linecap="round" stroke-dasharray="235.6" stroke-dashoffset="235.6"/>
+        <line id="gauge-needle" x1="90" y1="95" x2="90" y2="30" stroke="#14181A" stroke-width="2.5" stroke-linecap="round" style="transform-origin: 90px 95px; transform: rotate(-90deg);"/>
+        <circle cx="90" cy="95" r="5" fill="#14181A"/>
+      </svg>
+      <p class="mono" style="font-size:32px;font-weight:700;margin:0" id="score-number">0</p>
+      <p class="gauge-label">위험도 점수</p>
+      <p class="gauge-level" id="risk-level"></p>
+    </div>
+
+    <div class="flags-section">
+      <p class="section-title">탐지된 패턴</p>
+      <div id="flags-list"></div>
+    </div>
+
+    <div class="explain-section">
+      <p class="section-title">종합 판단</p>
+      <p id="explanation"></p>
+    </div>
+
+    <div class="transcript-section">
+      <button class="transcript-toggle" onclick="toggleTranscript()">
+        <span>인식된 통화 내용 보기</span>
+        <span class="chevron" id="chevron">▾</span>
+      </button>
+      <div class="transcript-body" id="transcript-body"></div>
+    </div>
+  </div>
+
+  <footer>본 서비스는 데모용이며, 실제 판단은 금융감독원(1332) 등 공식 채널을 통해 확인하세요.</footer>
+</div>
+
+<script>
+let activeTab = 'text';
+let selectedFile = null;
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-text').classList.toggle('active', tab === 'text');
+  document.getElementById('tab-audio').classList.toggle('active', tab === 'audio');
+  document.getElementById('panel-text').style.display = tab === 'text' ? 'block' : 'none';
+  document.getElementById('panel-audio').style.display = tab === 'audio' ? 'block' : 'none';
+  updateButtonState();
+}
+
+document.getElementById('script-input').addEventListener('input', updateButtonState);
+
+function updateButtonState() {
+  const btn = document.getElementById('analyze-btn');
+  if (activeTab === 'text') {
+    btn.disabled = !document.getElementById('script-input').value.trim();
+  } else {
+    btn.disabled = !selectedFile;
+  }
+}
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault();
+  dropzone.classList.add('drag-over');
+}));
+['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+}));
+dropzone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+function handleFile(file) {
+  hideError();
+  if (!file) return;
+  const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|m4a)$/i.test(file.name);
+  if (!isAudio) {
+    showError('지원하지 않는 파일 형식이에요. MP3, WAV, M4A 파일을 올려주세요.');
+    return;
+  }
+  if (file.size > 100 * 1024 * 1024) {
+    showError('파일이 너무 커요. 100MB 이하 파일만 업로드할 수 있어요.');
+    return;
+  }
+  selectedFile = file;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-preview').src = URL.createObjectURL(file);
+  document.getElementById('file-chip').style.display = 'flex';
+  dropzone.style.display = 'none';
+  updateButtonState();
+}
+
+document.getElementById('remove-file').addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  document.getElementById('file-chip').style.display = 'none';
+  dropzone.style.display = 'block';
+  updateButtonState();
+});
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-msg').style.display = 'none';
+}
+
+function toggleTranscript() {
+  const body = document.getElementById('transcript-body');
+  const chevron = document.getElementById('chevron');
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  chevron.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function riskColors(level) {
+  if (level === '높음') return { stroke: '#A32D2D', bg: '#FCEBEB' };
+  if (level === '보통') return { stroke: '#854F0B', bg: '#FAEEDA' };
+  return { stroke: '#3B6D11', bg: '#EAF3DE' };
+}
+
+function renderResult(data) {
+  const arcLength = 235.6;
+  const pct = Math.max(0, Math.min(100, data.risk_score)) / 100;
+  const colors = riskColors(data.risk_level);
+
+  document.getElementById('score-number').textContent = data.risk_score;
+  document.getElementById('score-number').style.color = colors.stroke;
+  document.getElementById('risk-level').textContent = data.risk_level;
+  document.getElementById('risk-level').style.color = colors.stroke;
+
+  const arc = document.getElementById('gauge-arc');
+  arc.setAttribute('stroke', colors.stroke);
+  arc.setAttribute('stroke-dashoffset', arcLength * (1 - pct));
+
+  const needle = document.getElementById('gauge-needle');
+  const angle = -90 + pct * 180;
+  needle.style.transform = `rotate(${angle}deg)`;
+
+  const flagsList = document.getElementById('flags-list');
+  flagsList.innerHTML = '';
+  if (data.flags.length === 0) {
+    flagsList.innerHTML = '<p class="no-flags">탐지된 위험 패턴이 없습니다.</p>';
+  } else {
+    data.flags.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'flag-item';
+      div.style.background = colors.bg;
+      div.innerHTML = `<p class="pattern" style="color:${colors.stroke}">${escapeHtml(f.pattern)}</p><p class="evidence" style="color:${colors.stroke}">"${escapeHtml(f.evidence)}"</p>`;
+      flagsList.appendChild(div);
+    });
+  }
+
+  document.getElementById('explanation').textContent = data.explanation;
+  document.getElementById('transcript-body').textContent = data.transcript;
+  document.getElementById('transcript-body').style.display = 'none';
+  document.getElementById('chevron').style.transform = 'rotate(0deg)';
+
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById('analyze-btn').addEventListener('click', async () => {
+  hideError();
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  document.getElementById('btn-label').textContent = '분석 중...';
+  document.querySelector('.spinner').style.display = 'inline-block';
+
+  try {
+    let res;
+    if (activeTab === 'text') {
+      res = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: document.getElementById('script-input').value })
+      });
+    } else {
+      const formData = new FormData();
+      formData.append('audio', selectedFile);
+      res = await fetch('/analyze', { method: 'POST', body: formData });
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || '분석 중 오류가 발생했습니다.');
+    } else {
+      renderResult(data);
+    }
+  } catch (err) {
+    showError('서버에 연결할 수 없습니다.');
+  } finally {
+    btn.classList.remove('loading');
+    document.getElementById('btn-label').textContent = '분석하기';
+    document.querySelector('.spinner').style.display = 'none';
+    updateButtonState();
+  }
+});
+</script>
+</body>
+</html>

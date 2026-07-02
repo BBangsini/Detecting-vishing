@@ -1,0 +1,16 @@
+{
+  "name": "voice-phishing-detector",
+  "version": "1.0.0",
+  "description": "보이스피싱 실시간 판별 AI - 통화 스크립트/녹음 파일을 분석해 위험도를 판정합니다",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "zod": "^3.23.8"
+  }
+}
