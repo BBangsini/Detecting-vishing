@@ -22,11 +22,27 @@ const AnalysisSchema = z.object({
  * @returns {{ success: true, data: object } | { success: false, error: string }}
  */
 function parseAndValidate(rawText) {
+  // Gemini가 가끔 ```json ... ``` 코드블록으로 감싸서 응답하는 경우 제거
+  let cleaned = rawText.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
+  }
+
   let parsed;
   try {
-    parsed = JSON.parse(rawText);
+    parsed = JSON.parse(cleaned);
   } catch (e) {
     return { success: false, error: "모델 응답이 올바른 JSON 형식이 아닙니다." };
+  }
+
+  // risk_score가 문자열("87")로 온 경우 숫자로 보정
+  if (typeof parsed.risk_score === "string") {
+    const n = Number(parsed.risk_score);
+    if (!Number.isNaN(n)) parsed.risk_score = Math.round(n);
+  }
+  // risk_level 앞뒤 공백 보정
+  if (typeof parsed.risk_level === "string") {
+    parsed.risk_level = parsed.risk_level.trim();
   }
 
   const result = AnalysisSchema.safeParse(parsed);
