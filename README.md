@@ -15,8 +15,7 @@
      ```
      GEMINI_API_KEY=발급받은_키
      ```
-   - `.env`를 자동으로 불러오려면 `npm install dotenv` 후 `server.js` 맨 위에
-     `require('dotenv').config();` 한 줄만 추가하면 됩니다.
+
 
 3. 서버 실행
    ```
